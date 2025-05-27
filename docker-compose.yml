@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  # PostPilot application service
+  postpilot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: postpilot-app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://mongodb:27017/postpilot
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    depends_on:
+      - mongodb
+    networks:
+      - postpilot-network
+    volumes:
+      - ./:/app
+      - /app/node_modules
+      - /app/.next
+
+  # MongoDB service
+  mongodb:
+    image: mongo:latest
+    container_name: postpilot-mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - postpilot-network
+    command: mongod --bind_ip_all
+
+# Define volumes
+volumes:
+  mongodb_data:
+    name: postpilot-mongodb-data
+
+# Define networks
+networks:
+  postpilot-network:
+    name: postpilot-network
+    driver: bridge

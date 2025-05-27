@@ -1,7 +1,9 @@
 "use client";
 import { useState, useEffect, useRef } from 'react';
-import { Send, User, Bot, Plus, Trash2, Edit, X, Loader2 } from 'lucide-react';
+import { Send, User, Bot, Plus, Trash2, Edit, X, Loader2, LogOut } from 'lucide-react';
 import { chatApi } from '@/lib/api';
+import { useUser, useAuth, SignOutButton } from '@clerk/nextjs';
+import { redirect } from 'next/navigation';
 
 type Message = {
   role: 'user' | 'assistant';
@@ -19,13 +21,16 @@ type Chat = {
 };
 
 export default function Home() {
+  const { isLoaded, isSignedIn, user } = useUser();
+  const { userId: clerkUserId } = useAuth();
+  
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [chats, setChats] = useState<Chat[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [loadingChats, setLoadingChats] = useState(false);
-  const [userId, setUserId] = useState('user-123'); // In a real app, get this from auth
+  const [userId, setUserId] = useState(clerkUserId || '');
   const [editingTitle, setEditingTitle] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [currentChatTitle, setCurrentChatTitle] = useState('');
@@ -34,10 +39,26 @@ export default function Home() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch chat history on component mount
+  // Redirect to sign-in if not authenticated
   useEffect(() => {
-    fetchChats();
-  }, []);
+    if (isLoaded && !isSignedIn) {
+      redirect('/sign-in');
+    }
+  }, [isLoaded, isSignedIn]);
+
+  // Update userId when clerk auth loads
+  useEffect(() => {
+    if (clerkUserId) {
+      setUserId(clerkUserId);
+    }
+  }, [clerkUserId]);
+
+  // Fetch chat history on component mount and when userId changes
+  useEffect(() => {
+    if (userId) {
+      fetchChats();
+    }
+  }, [userId]);
 
   // Focus title input when editing
   useEffect(() => {
@@ -47,6 +68,8 @@ export default function Home() {
   }, [editingTitle]);
 
   const fetchChats = async () => {
+    if (!userId) return;
+    
     setLoadingChats(true);
     setError(null);
     try {
@@ -130,7 +153,7 @@ export default function Home() {
   };
 
   const sendMessage = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || !userId) return;
 
     const userMessage: Message = { 
       role: 'user', 
@@ -219,8 +242,28 @@ export default function Home() {
     });
   };
 
+  // Show loading state while Clerk loads
+  if (!isLoaded) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-900">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="relative">
+            <Loader2 size={48} className="animate-spin text-blue-500" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+            </div>
+          </div>
+          <div className="flex flex-col items-center">
+            <p className="text-white text-xl font-medium">Loading</p>
+            <p className="text-gray-400 text-sm">Please wait while we set things up...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }       
+
   return (
-    <div className="flex bg-gray-50 h-[95vh]">  
+    <div className="flex bg-gray-50 h-screen">  
       {/* Sidebar */}
       <div className="w-64 bg-gray-900 text-white flex flex-col border-r border-white-800">
         <div className="p-4">
@@ -263,6 +306,29 @@ export default function Home() {
           ) : (
             <div className="text-center py-4 text-gray-500">No chats yet</div>
           )}
+        </div>
+
+        {/* User profile section */}
+        <div className="p-4 border-t border-gray-800">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              {user?.imageUrl && (
+                <img 
+                  src={user.imageUrl} 
+                  alt="Profile" 
+                  className="w-8 h-8 rounded-full mr-2"
+                />
+              )}
+              <div className="text-sm truncate">
+                {user?.fullName || user?.username || 'User'}
+              </div>
+            </div>
+            <SignOutButton>
+              <button className="p-1 rounded hover:bg-gray-800">
+                <LogOut size={16} />
+              </button>
+            </SignOutButton>
+          </div>
         </div>
       </div>
 

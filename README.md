@@ -6,6 +6,20 @@
 
 PostPilot is an AI-powered platform for generating social media content. Users can ask for content ideas, get post suggestions, and manage their content creation workflow.
 
+## Architecture
+
+![PostPilot Architecture Diagram](./architecture-diagram.png)
+
+PostPilot follows a modern architecture with containerized deployment:
+- Next.js frontend with Clerk authentication
+- Next.js API routes for backend services
+- Google Gemini AI for content generation
+- MongoDB for data storage
+- Docker for containerization
+- GitHub Actions for CI/CD
+
+For more details, see the [Architecture Documentation](./docs/architecture.md).
+
 ## Features
 
 - AI-powered content generation for social media
@@ -29,7 +43,7 @@ PostPilot is an AI-powered platform for generating social media content. Users c
 2. Install dependencies:
 
 ```bash
-npm install
+npm install --legacy-peer-deps
 ```
 
 3. Set up environment variables in `.env`:
@@ -65,10 +79,10 @@ docker-compose up -d
 
 This project uses GitHub Actions for CI/CD:
 
-1. **Test**: Runs linting and tests on every push and pull request
-2. **Build**: Builds the application on pushes to main
-3. **Docker Build and Push**: Builds and pushes Docker image to GitHub Container Registry
-4. **Deploy**: Deploys to production server on pushes to main
+1. **Build**: Builds the application on pushes to main
+2. **Docker Build and Push**: Builds and pushes Docker image to Docker Hub
+3. **Deploy to Staging**: Automatically deploys to staging environment
+4. **Deploy to Production**: Deploys to production after approval
 
 ## Project Structure
 
@@ -94,14 +108,25 @@ postpilot/
 │   └── Chat.ts
 ├── components/
 │   └── ErrorBoundary.tsx
+├── docs/
+│   ├── architecture.md
+│   └── architecture-diagram.png
 ├── .github/
 │   └── workflows/
 │       ├── ci-cd.yml
 │       ├── docker-publish.yml
-│       └── codeql-analysis.yml
+│       └── deploy.yml
 ├── Dockerfile
 └── docker-compose.yml
 ```
+
+## DevOps Features
+
+- **Containerization**: Docker for consistent environments
+- **CI/CD**: Automated workflows with GitHub Actions
+- **Container Registry**: Docker Hub for image storage
+- **Deployment**: Automated deployment to staging and production
+- **Security Scanning**: CodeQL for vulnerability detection
 
 ## Contributing
 

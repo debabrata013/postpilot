@@ -5,10 +5,10 @@ FROM node:18-alpine AS base
 WORKDIR /app
 
 # Copy package files
-COPY package.json package-lock.json ./
+COPY package.json ./
 
-# Install dependencies
-RUN npm ci
+# Install dependencies with force flag
+RUN npm install --force
 
 # Copy the rest of the application
 COPY . .

@@ -28,7 +28,6 @@ jobs:
       - name: Create staging docker-compose.yml
         run: |
           cat > docker-compose.staging.yml << EOF
-          version: '3.8'
           services:
             postpilot:
               image: ${{ secrets.DOCKERHUB_USERNAME }}/postpilot:latest
@@ -102,7 +101,6 @@ jobs:
       - name: Create production docker-compose.yml
         run: |
           cat > docker-compose.production.yml << EOF
-          version: '3.8'
           services:
             postpilot:
               image: ${{ secrets.DOCKERHUB_USERNAME }}/postpilot:latest

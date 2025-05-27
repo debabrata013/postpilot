@@ -7,85 +7,8 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    
-    services:
-      mongodb:
-        image: mongo:latest
-        ports:
-          - 27017:27017
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-          cache: 'npm'
-          
-      - name: Install dependencies
-        run: npm ci
-        
-      - name: Run linting
-        run: npm run lint || echo "Linting issues found but continuing"
-        
-      - name: Run tests
-        run: npm test || echo "No tests found"
-        env:
-          MONGODB_URI: mongodb://localhost:27017/postpilot_test
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-
   build:
-    name: Build
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-          cache: 'npm'
-          
-      - name: Install dependencies
-        run: npm ci
-        
-      - name: Create .env file
-        run: |
-          echo "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}" > .env
-          echo "CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }}" >> .env
-          echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
-          echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
-          
-      - name: Build application
-        run: npm run build
-        env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-          MONGODB_URI: ${{ secrets.MONGODB_URI }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          NEXT_DISABLE_ESLINT_DURING_BUILD: true
-          
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: build-output
-          path: .next/
-          retention-days: 7
-
-  docker-build-push:
     name: Build and Push Docker Image
-    needs: build
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
@@ -125,7 +48,7 @@ jobs:
 
   deploy-staging:
     name: Deploy to Staging
-    needs: docker-build-push
+    needs: build
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment: staging

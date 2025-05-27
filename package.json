@@ -12,7 +12,7 @@
     "test:ci": "jest --ci --coverage"
   },
   "dependencies": {
-    "@clerk/nextjs": "^6.20.0",
+    "@clerk/nextjs": "^6.20.1",
     "axios": "^1.9.0",
     "dotenv": "^16.5.0",
     "lucide-react": "^0.511.0",

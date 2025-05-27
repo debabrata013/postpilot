@@ -1,0 +1,10 @@
+# These owners will be the default owners for everything in the repo
+* @debabratapattnayak
+
+# Specific ownership for critical files
+/app/api/ @debabratapattnayak
+/lib/ @debabratapattnayak
+/models/ @debabratapattnayak
+/Dockerfile @debabratapattnayak
+/docker-compose.yml @debabratapattnayak
+/.github/workflows/ @debabratapattnayak

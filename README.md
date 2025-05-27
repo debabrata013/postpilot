@@ -1,5 +1,9 @@
 # PostPilot
 
+![PostPilot CI/CD](https://github.com/debabratapattnayak/postpilot/actions/workflows/ci-cd.yml/badge.svg)
+![Docker Build](https://github.com/debabratapattnayak/postpilot/actions/workflows/docker-publish.yml/badge.svg)
+![CodeQL](https://github.com/debabratapattnayak/postpilot/actions/workflows/codeql-analysis.yml/badge.svg)
+
 PostPilot is an AI-powered platform for generating social media content. Users can ask for content ideas, get post suggestions, and manage their content creation workflow.
 
 ## Features
@@ -8,6 +12,7 @@ PostPilot is an AI-powered platform for generating social media content. Users c
 - Chat history to review previous conversations
 - Content suggestions for different platforms (Twitter, Instagram, LinkedIn)
 - User-friendly interface with real-time responses
+- User authentication with Clerk
 
 ## Getting Started
 
@@ -15,6 +20,8 @@ PostPilot is an AI-powered platform for generating social media content. Users c
 
 - Node.js 18+ and npm
 - MongoDB database
+- Clerk account for authentication
+- Google Gemini API key
 
 ### Installation
 
@@ -42,38 +49,26 @@ npm run dev
 
 5. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## Testing the API
+## Docker Setup
 
-### Using the JavaScript Test Script
-
-Run the JavaScript test script to test all API endpoints:
+You can also run PostPilot using Docker:
 
 ```bash
-node test-api.js
+# Build the Docker images
+docker-compose build
+
+# Start the containers
+docker-compose up -d
 ```
 
-### Using the Bash Test Script
+## CI/CD Pipeline
 
-Run the bash script to test all API endpoints using curl:
+This project uses GitHub Actions for CI/CD:
 
-```bash
-./test-api.sh
-```
-
-## API Endpoints
-
-### Chat Management
-
-- `POST /api/chat` - Create a new chat
-- `PUT /api/chat` - Update an existing chat with a new message
-- `GET /api/chat/:id` - Get a specific chat by ID
-- `PATCH /api/chat/:id` - Update a chat's title
-- `DELETE /api/chat/:id` - Delete a chat
-
-### Chat Listing
-
-- `GET /api/chats` - List all chats for a user
-- `GET /api/chat/history` - Get paginated chat history for a user
+1. **Test**: Runs linting and tests on every push and pull request
+2. **Build**: Builds the application on pushes to main
+3. **Docker Build and Push**: Builds and pushes Docker image to GitHub Container Registry
+4. **Deploy**: Deploys to production server on pushes to main
 
 ## Project Structure
 
@@ -83,25 +78,39 @@ postpilot/
 │   ├── api/
 │   │   ├── chat/
 │   │   │   ├── [id]/
-│   │   │   │   └── route.ts
 │   │   │   ├── history/
-│   │   │   │   └── route.ts
 │   │   │   └── route.ts
 │   │   └── chats/
-│   │       └── route.ts
 │   ├── page.tsx
+│   ├── sign-in/
+│   ├── sign-up/
 │   └── layout.tsx
 ├── lib/
+│   ├── api.ts
 │   ├── gemini.ts
 │   ├── mongodb.ts
 │   └── utils.ts
 ├── models/
 │   └── Chat.ts
-├── public/
-├── test-api.js
-└── test-api.sh
+├── components/
+│   └── ErrorBoundary.tsx
+├── .github/
+│   └── workflows/
+│       ├── ci-cd.yml
+│       ├── docker-publish.yml
+│       └── codeql-analysis.yml
+├── Dockerfile
+└── docker-compose.yml
 ```
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License

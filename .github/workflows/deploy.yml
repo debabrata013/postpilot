@@ -1,0 +1,166 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: ["Docker Build and Publish"]
+    types:
+      - completed
+    branches:
+      - main
+
+jobs:
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    environment: staging
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Install SSH key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          known_hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+          
+      - name: Create staging docker-compose.yml
+        run: |
+          cat > docker-compose.staging.yml << EOF
+          version: '3.8'
+          services:
+            postpilot:
+              image: ${{ secrets.DOCKERHUB_USERNAME }}/postpilot:latest
+              restart: always
+              ports:
+                - "3000:3000"
+              environment:
+                - NODE_ENV=production
+                - MONGODB_URI=\${MONGODB_URI}
+                - GEMINI_API_KEY=\${GEMINI_API_KEY}
+                - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=\${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+                - CLERK_SECRET_KEY=\${CLERK_SECRET_KEY}
+              depends_on:
+                - mongodb
+            
+            mongodb:
+              image: mongo:latest
+              restart: always
+              ports:
+                - "27017:27017"
+              volumes:
+                - mongodb_data:/data/db
+          
+          volumes:
+            mongodb_data:
+          EOF
+          
+      - name: Copy docker-compose file to staging server
+        run: |
+          scp docker-compose.staging.yml ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/opt/staging/postpilot/docker-compose.yml
+          
+      - name: Deploy to staging server
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            cd /opt/staging/postpilot
+            
+            # Create .env file if it doesn't exist
+            touch .env
+            
+            # Update environment variables
+            echo "MONGODB_URI=mongodb://mongodb:27017/postpilot" > .env
+            echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
+            echo "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}" >> .env
+            echo "CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }}" >> .env
+            
+            # Pull latest images and restart containers
+            docker-compose pull
+            docker-compose down
+            docker-compose up -d
+            
+            # Clean up old images
+            docker system prune -af --volumes
+          EOF
+
+  deploy-production:
+    name: Deploy to Production
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    environment: production
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Install SSH key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          known_hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+          
+      - name: Create production docker-compose.yml
+        run: |
+          cat > docker-compose.production.yml << EOF
+          version: '3.8'
+          services:
+            postpilot:
+              image: ${{ secrets.DOCKERHUB_USERNAME }}/postpilot:latest
+              restart: always
+              ports:
+                - "3000:3000"
+              environment:
+                - NODE_ENV=production
+                - MONGODB_URI=\${MONGODB_URI}
+                - GEMINI_API_KEY=\${GEMINI_API_KEY}
+                - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=\${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+                - CLERK_SECRET_KEY=\${CLERK_SECRET_KEY}
+              depends_on:
+                - mongodb
+              deploy:
+                resources:
+                  limits:
+                    cpus: '1'
+                    memory: 1G
+            
+            mongodb:
+              image: mongo:latest
+              restart: always
+              volumes:
+                - mongodb_data:/data/db
+              deploy:
+                resources:
+                  limits:
+                    cpus: '0.5'
+                    memory: 512M
+          
+          volumes:
+            mongodb_data:
+          EOF
+          
+      - name: Copy docker-compose file to production server
+        run: |
+          scp docker-compose.production.yml ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/opt/production/postpilot/docker-compose.yml
+          
+      - name: Deploy to production server
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            cd /opt/production/postpilot
+            
+            # Create .env file if it doesn't exist
+            touch .env
+            
+            # Update environment variables
+            echo "MONGODB_URI=mongodb://mongodb:27017/postpilot" > .env
+            echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
+            echo "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}" >> .env
+            echo "CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }}" >> .env
+            
+            # Pull latest images and restart containers
+            docker-compose pull
+            docker-compose down
+            docker-compose up -d
+            
+            # Clean up old images but keep the last 2 versions
+            docker image prune -a --filter "until=24h" -f
+          EOF

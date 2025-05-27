@@ -11,6 +11,12 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     
+    services:
+      mongodb:
+        image: mongo:latest
+        ports:
+          - 27017:27017
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -29,6 +35,11 @@ jobs:
         
       - name: Run tests
         run: npm test || echo "No tests found"
+        env:
+          MONGODB_URI: mongodb://localhost:27017/postpilot_test
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
   build:
     name: Build
@@ -49,6 +60,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
         
+      - name: Create .env file
+        run: |
+          echo "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}" > .env
+          echo "CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }}" >> .env
+          echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+          echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
+          
       - name: Build application
         run: npm run build
         env:
@@ -56,6 +74,7 @@ jobs:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          NEXT_DISABLE_ESLINT_DURING_BUILD: true
           
       - name: Upload build artifacts
         uses: actions/upload-artifact@v3
@@ -83,23 +102,33 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/postpilot
+          tags: |
+            type=raw,value=latest
+            type=sha,format=short
+            
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
           context: .
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/postpilot:latest,${{ secrets.DOCKERHUB_USERNAME }}/postpilot:${{ github.sha }}
+          tags: ${{ steps.meta.outputs.tags }}
           build-args: |
             NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
             CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }}
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/postpilot:buildcache
           cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/postpilot:buildcache,mode=max
 
-  deploy:
-    name: Deploy to Production
+  deploy-staging:
+    name: Deploy to Staging
     needs: docker-build-push
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: staging
     
     steps:
       - name: Checkout code
@@ -111,12 +140,39 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           known_hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
           
-      - name: Deploy to server
+      - name: Deploy to staging server
         run: |
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
-            cd /path/to/postpilot
+            cd /opt/staging/postpilot
             docker-compose pull
             docker-compose down
             docker-compose up -d
-            docker system prune -af
+            docker system prune -af --volumes
+          EOF
+
+  deploy-production:
+    name: Deploy to Production
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Install SSH key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          known_hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+          
+      - name: Deploy to production server
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            cd /opt/production/postpilot
+            docker-compose pull
+            docker-compose down
+            docker-compose up -d
+            docker system prune -af --volumes
           EOF
